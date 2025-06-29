@@ -1,0 +1,254 @@
+##this script is for the IPAI poster using the t-release data, 9/30
+library(ggplot2)
+library(lme4) #for regression analysis
+library(dplyr)
+library(stringr)
+library(randomForest)
+
+data <- read.csv("/Users/boneless-tofu/Downloads/t-release, ADS remix!_August 15, 2024_15.43 2.csv")
+
+#removing random qualtrics row 
+data <- data[-2, ]
+
+##renaming the columns
+names(data)[names(data) == "Q144"] <- "LisenerRecognizeVoice"
+names(data)[names(data) == "Q137"] <- "ListenerAge"
+names(data)[names(data) == "Q35"] <- "ListenerRegion"
+names(data)[names(data) == "Q19"] <- "LisenerSES"
+names(data)[names(data) == "Q18"] <- "ListenerSexuality"
+names(data)[names(data) == "Q17"] <- "ListenerGender"
+names(data)[names(data) == "Q16"] <- "ListenerRace"
+names(data)[names(data) == "Q16"] <- "ListenerRace"
+names(data)[names(data) == "Q16"] <- "ListenerRace"
+names(data)[names(data) == "Q40_released_1"] <- "ReleasedFem"
+names(data)[names(data) == "Q40_released_2"] <- "ReleasedMasc"
+names(data)[names(data) == "Q40_released_3"] <- "ReleasedIntelligent"
+names(data)[names(data) == "Q40_released_4"] <- "ReleasedAuthoritative"
+names(data)[names(data) == "Q40_released_5"] <- "ReleasedYouthful"
+names(data)[names(data) == "Q40_released_6"] <- "ReleasedEnergetic"
+names(data)[names(data) == "Q40_released_7"] <- "ReleasedArticulate"
+names(data)[names(data) == "Q40_released_8"] <- "ReleasedEducated"
+names(data)[names(data) == "Q40_released_9"] <- "ReleasedAsian"
+names(data)[names(data) == "Q40_released_10"] <- "ReleasedWhite"
+names(data)[names(data) == "Q40_released_11"] <- "ReleasedQueer"
+names(data)[names(data) == "Q40_released_12"] <- "ReleasedStraight"
+names(data)[names(data) == "Q38_released"] <- "ReleasedSES"
+names(data)[names(data) == "Q26_released"] <- "ReleasedRegion"
+names(data)[names(data) == "Q40_released"] <- "Released"
+names(data)[names(data) == "Q37_unreleased_1"] <- "UnreleasedFem"
+names(data)[names(data) == "Q37_unreleased_2"] <- "UnreleasedMasc"
+names(data)[names(data) == "Q37_unreleased_3"] <- "UnreleasedIntelligent"
+names(data)[names(data) == "Q37_unreleased_4"] <- "UnreleasedAuthoritative"
+names(data)[names(data) == "Q37_unreleased_5"] <- "UnreleasedYouthful"
+names(data)[names(data) == "Q37_unreleased_6"] <- "UnreleasedEnergetic"
+names(data)[names(data) == "Q37_unreleased_7"] <- "UnreleasedArticulate"
+names(data)[names(data) == "Q37_unreleased_8"] <- "UnreleasedEducated"
+names(data)[names(data) == "Q37_unreleased_9"] <- "UnreleasedStraight"
+names(data)[names(data) == "Q37_unreleased_10"] <- "UnreleasedQueer"
+names(data)[names(data) == "Q37_unreleased_11"] <- "UnreleasedAsian"
+names(data)[names(data) == "Q37_unreleased_12"] <- "UnreleasedWhite"
+names(data)[names(data) == "Q30_unreleased"] <- "UnreleasedSES"
+names(data)[names(data) == "Q39_unreleased"] <- "UnreleasedRegion"
+
+##creating a new column called Variant. If there are data in the ReleasedFem column, 
+##make the row in the Variant column say "Released". If there are data in the UnreleasedFem column,
+##make the row in the Variant column say "Unreleased"
+data <- data %>%
+  mutate(Variant = case_when(
+    !is.na(ReleasedFem) & ReleasedFem != "" ~ "Released",
+    !is.na(UnreleasedFem) & UnreleasedFem != "" ~ "Unreleased",
+    TRUE ~ NA_character_  # Use NA if both columns are empty
+  ))
+
+##combinging the released and unreleased columns to make the dataset more tidy
+data$Fem <- str_c(data$ReleasedFem, data$UnreleasedFem, sep = "")
+data$Masc <- str_c(data$ReleasedMasc, data$UnreleasedMasc, sep = "")
+data$Intelligent <- str_c(data$ReleasedIntelligent, data$UnreleasedIntelligent, sep = "")
+data$Authoritative <- str_c(data$ReleasedAuthoritative, data$UnreleasedAuthoritative, sep = "")
+data$Youthful <- str_c(data$ReleasedYouthful, data$UnreleasedYouthful, sep = "")
+data$Energetic <- str_c(data$ReleasedEnergetic, data$UnreleasedEnergetic, sep = "")
+data$Articulate <- str_c(data$ReleasedArticulate, data$UnreleasedArticulate, sep = "")
+data$Educated <- str_c(data$ReleasedEducated, data$UnreleasedEducated, sep = "")
+data$Asian <- str_c(data$ReleasedAsian, data$UnreleasedAsian, sep = "")
+data$White <- str_c(data$ReleasedWhite, data$UnreleasedWhite, sep = "")
+data$Queer <- str_c(data$ReleasedQueer, data$UnreleasedQueer, sep = "")
+data$Straight <- str_c(data$ReleasedStraight, data$UnreleasedStraight, sep = "")
+data$SES <- str_c(data$ReleasedSES, data$UnreleasedSES, sep = "")
+data$Region <- str_c(data$ReleasedRegion, data$UnreleasedRegion, sep = "")
+
+
+##Exclude any rows where Variant is empty, ie. the survey wasn't completed 
+data <- data %>% filter(Variant != "")
+
+##looks good, removing the first row since i don't need the qualtrics questions anymore 
+data <- data[-1, ]
+
+##making sure each scale is numeric 
+data <- data %>%
+  mutate(
+    Masc = as.numeric(Masc),
+    Fem = as.numeric(Fem),
+    Intelligent = as.numeric(Intelligent),
+    Authoritative = as.numeric(Authoritative),
+    Youthful = as.numeric(Youthful),
+    Energetic = as.numeric(Energetic),
+    Articulate = as.numeric(Articulate),
+    Educated = as.numeric(Educated),
+    Asian = as.numeric(Asian),
+    White = as.numeric(White),
+    Queer = as.numeric(Queer),
+    Straight = as.numeric(Straight)
+  )
+
+#making the variant column factor 
+data <- data%>%
+  mutate(
+    Variant = as.factor(Variant))
+
+#subsetting the dataset for some RFs 
+subsetted_data <- data[c("Educated", "Masc", "Fem", "Intelligent", "Authoritative",
+                         "Youthful", "Energetic", "Articulate", "Asian", "White", 
+                         "Queer", "Straight")]
+
+View(subsetted_data)
+#looks good 
+
+
+##create correlation matrix 
+corr_matrix <- cor(subsetted_data, use = "pairwise.complete.obs")
+
+# Visualize
+corrplot(corr_matrix, method = "color", type = "lower",
+         col = colorRampPalette(c("red", "white", "blue"))(200),
+         tl.col = "black", tl.srt = 45, addCoef.col = "black")
+##interesting. looks like educated, articulate, and intelligent have strong relationships w/ one another. 
+
+
+
+corr_matrix <- cor(subsetted_data, use = "pairwise.complete.obs")
+
+# Function to compute p-values
+cor.mtest <- function(mat, conf.level = 0.95) {
+  mat <- as.matrix(mat)
+  n <- ncol(mat)
+  p.mat <- matrix(NA, n, n)
+  diag(p.mat) <- 0
+  for (i in 1:(n - 1)) {
+    for (j in (i + 1):n) {
+      tmp <- cor.test(mat[, i], mat[, j], conf.level = conf.level)
+      p.mat[i, j] <- p.mat[j, i] <- tmp$p.value
+    }
+  }
+  colnames(p.mat) <- rownames(p.mat) <- colnames(mat)
+  p.mat
+}
+
+# Get matrix of p-values
+p_matrix <- cor.mtest(subsetted_data)
+
+# Plot with significance stars (only show coefficients with p < 0.05)
+corrplot(corr_matrix, 
+         method = "color", 
+         type = "lower",
+         col = colorRampPalette(c("red", "white", "blue"))(200),
+         tl.col = "black", 
+         tl.srt = 45, 
+         addCoef.col = "black",
+         p.mat = p_matrix, 
+         sig.level = 0.05,   # threshold for significance
+         insig = "blank")    # blank out insignificant correlations
+
+##this is neat, I think the sig.level probable would need to be adjusted but gonna focus in on a couple scales here anyways 
+
+#random forest models to investigate indiviual scales 
+
+Intelligent_Model = randomForest(x = subsetted_data[-4], 
+                             y = subsetted_data$Intelligent, 
+                             ntree = 500) 
+
+plot(Intelligent_Model)
+##looking good 
+importance(Intelligent_Model) 
+
+# Variable importance plot 
+varImpPlot(Intelligent_Model)
+
+##okay that's not what I want 
+Educated_Model = randomForest(x = subsetted_data[-1], 
+                                 y = subsetted_data$Educated, 
+                                 ntree = 500) 
+
+plot(Educated_Model)
+
+importance(Educated_Model) 
+
+# Variable importance plot 
+varImpPlot(Educated_Model)
+
+##okay looking at Articulate 
+Articulate_Model = randomForest(x = subsetted_data[-9], 
+                              y = subsetted_data$Articulate, 
+                              ntree = 1000) 
+
+plot(Articulate_Model)
+##error rate looking a little sketchy 
+
+importance(Articulate_Model) 
+
+# Variable importance plot 
+varImpPlot(Articulate_Model)
+
+##plotting some of the correlations that are clearly relational 
+  ggplot(subsetted_data, aes(x = Educated, y = Articulate)) + 
+    geom_smooth(method = "loess", color = 'red', size = 1.2, se = TRUE) + 
+    labs(title = "Percieved Articulate vs. Educated",
+         x = "Education Level",
+         y = "Articulation Level") +
+    theme_minimal() 
+  
+ggplot(subsetted_data, aes(x = Intelligent, y = Articulate)) +
+    geom_smooth(method = "loess", color = "red", size = 1.2, se = TRUE) +  # Smoother line
+    labs(title = "Percieved Intelligent vs Articulate Ratings",
+         x = "Percieved Intelligent",
+         y = "Percieved Articulate") +
+    theme_minimal()
+
+ggplot(subsetted_data, aes(x = Educated, y = Intelligent)) +
+  geom_smooth(method = "loess", color = "red", size = 1.2, se = TRUE) +  # Smoother line
+  labs(title = "Percieved Educated vs Intelligent Ratings",
+       x = "Percieved Educated",
+       y = "Percieved Intelligent") +
+  theme_minimal()
+
+##looking at scales for race now 
+Asian_Model = randomForest(x = subsetted_data[-9], 
+                              y = subsetted_data$Asian, 
+                              ntree = 200) 
+
+plot(Asian_Model)
+##yay this is a good sign
+
+importance(Asian_Model) 
+
+# Variable importance plot 
+varImpPlot(Asian_Model)
+
+library(ggplot2)
+ggplot(subsetted_data, aes(x = Asian, y = White)) +
+  geom_smooth(method = "loess", color = "red", size = 1.2, se = TRUE) +  # Smoother line
+  labs(title = "Percieved Asian vs White Ratings",
+       x = "Percieved Asian",
+       y = "Percieved White") +
+  theme_minimal()
+
+White_Model = randomForest(x = subsetted_data[-10], 
+                           y = subsetted_data$White, 
+                           ntree = 400) 
+
+plot(White_Model)
+##yay this is a good sign
+
+importance(White_Model) 
+
+# Variable importance plot 
+varImpPlot(White_Model)
