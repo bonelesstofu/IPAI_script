@@ -1,2 +1,3 @@
 # IPAI_script 
-This is the R script created for analyzing the relationship between a couple of the scales in the t-release perceptual survey. Note that these analyeses don't directly focus on the linguistic variable, but consider the relationship between some of the attributes within the context of the talker for this study (a younger, college educated woman). 
+This is an R script created for analyzing the relationship between a few of the scales in the t-release perceptual survey data. Results were shared among both linguists and those workign in the education design space. A link to these materials will be added soon.
+See the WECOL script for how these same data were analyzed with a greater attention to the linguistic variable. 
